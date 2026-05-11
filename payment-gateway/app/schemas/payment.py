@@ -4,7 +4,7 @@ from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from app.models.models import TipoTarjeta
+from app.models.models import EstadoLiquidacion, EstadoTransaccion, TipoTarjeta
 
 
 # ---------- Entrada ----------
@@ -53,3 +53,16 @@ class CrearPagoRequest(BaseModel):
         if not v.isdigit():
             raise ValueError("El CVV debe contener solo dígitos.")
         return v
+    
+class PagoResponse(BaseModel):
+    """Respuesta de la pasarela al sistema de boletas tras procesar un pago."""
+ 
+    model_config = ConfigDict(from_attributes=True)
+ 
+    id: uuid.UUID
+    empresa_id: uuid.UUID
+    monto: Decimal
+    tipo_tarjeta: TipoTarjeta
+    estado_transaccion: EstadoTransaccion
+    estado_liquidacion: EstadoLiquidacion | None
+    creado_en: datetime
