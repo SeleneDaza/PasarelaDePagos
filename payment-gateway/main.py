@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.db.database import engine, Base
-
+from app.routers import payments
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -20,6 +20,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.include_router(payments.router)
 
 @app.get("/health", tags=["health"])
 async def health_check():
