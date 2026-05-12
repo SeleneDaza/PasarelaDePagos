@@ -38,11 +38,17 @@ class CardClient:
 
         try:
             async with httpx.AsyncClient(timeout=self.TIMEOUT_SEGUNDOS) as client:
-                response = await client.post(url, params=payload)
-                response.raise_for_status()
-                data = response.json()
-                return bool(data.get("existe", False))
-        except (httpx.TimeoutException, httpx.HTTPError) as exc:
+                response = await client.post(url, json=payload)
+        except (httpx.TimeoutException, httpx.NetworkError) as exc:
             raise CardServiceError(
                 f"Error al comunicarse con el servicio {tipo_tarjeta.value}: {exc}"
             ) from exc
+
+        if response.status_code >= 500:
+            raise CardServiceError(
+                f"El servicio {tipo_tarjeta.value} respondió con error {response.status_code}"
+            )
+
+        response.raise_for_status()
+        data = response.json()
+        return bool(data.get("existe", False))
