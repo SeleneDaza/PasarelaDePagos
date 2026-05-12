@@ -29,6 +29,7 @@ class PaymentService:
                 tipo_tarjeta=payload.tipo_tarjeta,
                 numero_tarjeta=payload.numero_tarjeta,
                 cvv=payload.cvv,
+                fecha_expiracion=payload.fecha_expiracion,
             )
         except CardServiceError:
             # 3a. Falla técnica → estado_transaccion = fallido, sin liquidación

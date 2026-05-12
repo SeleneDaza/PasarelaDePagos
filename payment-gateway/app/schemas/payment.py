@@ -40,6 +40,11 @@ class CrearPagoRequest(BaseModel):
         description="Código de seguridad. No se persiste en la pasarela.",
     )
 
+    fecha_expiracion: str | None = Field(
+    None,
+    description="Fecha de expiración MM/AA. Requerida para Mastercard.",
+    )
+
     @field_validator("numero_tarjeta")
     @classmethod
     def solo_digitos_tarjeta(cls, v: str) -> str:
