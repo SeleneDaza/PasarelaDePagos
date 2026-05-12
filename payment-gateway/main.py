@@ -2,8 +2,10 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from app.db.database import engine, Base
-from app.routers import payments
+from app.db.database import Base, engine
+from app.routers import payments, mock
+from app.config import settings
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -21,6 +23,10 @@ app = FastAPI(
 )
 
 app.include_router(payments.router)
+
+if settings.APP_ENV == "development":
+    app.include_router(mock.router)
+
 
 @app.get("/health", tags=["health"])
 async def health_check():
