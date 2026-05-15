@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.db.database import Base, engine
-from app.routers import payments, mock
+from app.routers import payments, mock, reports
 from app.config import settings
 
 
@@ -23,6 +23,7 @@ app = FastAPI(
 )
 
 app.include_router(payments.router)
+app.include_router(reports.router)
 
 if settings.APP_ENV == "development":
     app.include_router(mock.router)
