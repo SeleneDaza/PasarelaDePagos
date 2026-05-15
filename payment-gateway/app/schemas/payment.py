@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
 
 from app.models.models import EstadoLiquidacion, EstadoTransaccion, TipoTarjeta
 
@@ -71,3 +71,17 @@ class PagoResponse(BaseModel):
     estado_transaccion: EstadoTransaccion
     estado_liquidacion: EstadoLiquidacion | None
     creado_en: datetime
+
+    @computed_field
+    @property
+    def success(self) -> bool:
+        return self.estado_transaccion == EstadoTransaccion.aprobado
+
+    @computed_field
+    @property
+    def message(self) -> str:
+        return {
+            EstadoTransaccion.aprobado: "Pago aprobado correctamente.",
+            EstadoTransaccion.rechazado: "Tarjeta rechazada.",
+            EstadoTransaccion.fallido: "Error al procesar el pago. Intente más tarde.",
+        }[self.estado_transaccion]
