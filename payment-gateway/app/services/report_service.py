@@ -58,7 +58,7 @@ class ReportService:
             )
         if not empresa.activo:
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Empresa no autorizada para consultar reportes.",
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Empresa no encontrada.",
             )
         return empresa

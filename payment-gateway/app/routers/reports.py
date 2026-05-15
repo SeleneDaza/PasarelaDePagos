@@ -24,13 +24,11 @@ router = APIRouter(prefix="/reportes", tags=["Reportes"])
     responses={
         200: {"description": "Reporte generado correctamente."},
         400: {"description": "Rango de fechas inválido (fecha_inicio > fecha_fin)."},
-        403: {"description": "Empresa no autorizada."},
         404: {"description": "Empresa no encontrada."},
-        422: {"description": "Parámetros de entrada inválidos."},
     },
 )
 async def reporte_pendientes(
-    empresa_id: uuid.UUID = Query(..., description="ID de la empresa a consultar."),
+    empresa_id: str = Query(..., description="ID (UUID) de la empresa a consultar."),
     fecha_inicio: date | None = Query(
         None,
         description="Fecha de inicio del rango (YYYY-MM-DD). Incluye todo el día.",
@@ -41,6 +39,14 @@ async def reporte_pendientes(
     ),
     db: AsyncSession = Depends(get_db),
 ) -> ReportePendientesResponse:
+    try:
+        parsed_id = uuid.UUID(empresa_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Empresa no encontrada.",
+        )
+
     if fecha_inicio and fecha_fin and fecha_inicio > fecha_fin:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -48,4 +54,4 @@ async def reporte_pendientes(
         )
 
     service = ReportService(db)
-    return await service.obtener_pendientes(empresa_id, fecha_inicio, fecha_fin)
+    return await service.obtener_pendientes(parsed_id, fecha_inicio, fecha_fin)
