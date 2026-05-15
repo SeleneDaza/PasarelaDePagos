@@ -26,6 +26,7 @@ class CardClient:
         tipo_tarjeta: TipoTarjeta,
         numero_tarjeta: str,
         cvv: str,
+        fecha_expiracion: str | None = None,
     ) -> bool:
         """
         Llama al servicio serverless correspondiente y devuelve si la tarjeta existe.
@@ -35,6 +36,8 @@ class CardClient:
         """
         url = self._urls[tipo_tarjeta]
         payload = {"numero_tarjeta": numero_tarjeta, "cvv": cvv}
+        if tipo_tarjeta == TipoTarjeta.mastercard and fecha_expiracion:
+            payload["fecha_expiracion"] = fecha_expiracion
 
         try:
             async with httpx.AsyncClient(timeout=self.TIMEOUT_SEGUNDOS) as client:
