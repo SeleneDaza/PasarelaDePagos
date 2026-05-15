@@ -85,3 +85,23 @@ class PagoResponse(BaseModel):
             EstadoTransaccion.rechazado: "Tarjeta rechazada.",
             EstadoTransaccion.fallido: "Error al procesar el pago. Intente más tarde.",
         }[self.estado_transaccion]
+
+
+# ---------- Reportes ----------
+
+class TransaccionReporteItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    monto: Decimal
+    tipo_tarjeta: TipoTarjeta
+    estado_transaccion: EstadoTransaccion
+    creado_en: datetime
+
+
+class ReportePendientesResponse(BaseModel):
+    empresa_id: uuid.UUID
+    empresa_nombre: str
+    cantidad: int
+    total_pendiente: Decimal
+    transacciones: list[TransaccionReporteItem]
