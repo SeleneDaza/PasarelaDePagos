@@ -24,9 +24,9 @@ router = APIRouter(prefix="/liquidaciones", tags=["Liquidaciones"])
         404: {"description": "Empresa no encontrada."},
     },
 )
-async def liquidar_batch(
+async def liquidate_batch(
     payload: LiquidacionBatchRequest,
     db: AsyncSession = Depends(get_db),
 ) -> LiquidacionBatchResponse:
     service = LiquidationService(db)
-    return await service.liquidar_batch(payload.empresa_id)
+    return await service.liquidate_batch(payload.empresa_id)

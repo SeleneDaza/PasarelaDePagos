@@ -11,15 +11,15 @@ logger = logging.getLogger(__name__)
 scheduler = AsyncIOScheduler(timezone="UTC")
 
 
-async def _ejecutar_liquidacion_mensual() -> None:
+async def _run_monthly_liquidation() -> None:
     async with AsyncSessionLocal() as session:
         try:
             service = LiquidationService(session)
-            resultado = await service.liquidar_batch()
+            result = await service.liquidate_batch()
             await session.commit()
             logger.info(
                 "Liquidación mensual completada: %d transacciones liquidadas.",
-                resultado.procesadas,
+                result.procesadas,
             )
         except Exception:
             await session.rollback()
@@ -27,7 +27,7 @@ async def _ejecutar_liquidacion_mensual() -> None:
 
 
 scheduler.add_job(
-    _ejecutar_liquidacion_mensual,
+    _run_monthly_liquidation,
     CronTrigger(day=1, hour=0, minute=0),
     id="liquidacion_mensual",
     replace_existing=True,

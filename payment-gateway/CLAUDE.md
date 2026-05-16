@@ -47,6 +47,36 @@ APP_ENV=development               # set to "production" to disable mock routes
 
 In development, `VISA_SERVICE_URL` and `MASTERCARD_SERVICE_URL` point to the same app (`localhost:8000` / `localhost:8001`) or to the mock endpoints on this server.
 
+## Servicios implementados
+
+### Reportes (`app/routers/reports.py`, `app/services/report_service.py`)
+- `GET /reportes/pendientes?empresa_id=<uuid>` — lista transacciones con `estado_liquidacion=no_liquidado` y el total acumulado.
+- `empresa_id` se recibe como `str` y se parsea manualmente a UUID para devolver 404 en vez de 422 si el formato es inválido.
+- Empresa inexistente o inactiva → 404 con el mismo mensaje ("Empresa no encontrada.").
+- Filtros opcionales: `fecha_inicio` y `fecha_fin` (YYYY-MM-DD). Si `fecha_inicio > fecha_fin` → 400.
+
+### Liquidación batch (`app/routers/liquidations.py`, `app/services/liquidation_service.py`)
+- `POST /liquidaciones/batch` con body `{"empresa_id": "<uuid>"}` (opcional). Sin `empresa_id` liquida todas las empresas.
+- Cambia `estado_liquidacion: no_liquidado → liquidado` en una sola transacción de BD.
+- Se ejecuta automáticamente el día 1 de cada mes a las 00:00 UTC vía APScheduler (`app/scheduler.py`).
+- El scheduler arranca y para en el `lifespan` de FastAPI.
+
+### Logging (`app/logging_config.py`)
+- Logger raíz: `app` (captura `app.services.*`, `app.routers.*`, etc.).
+- Dos handlers: consola (formato legible) y archivo rotativo `logs/app.log` (formato JSON, 10 MB × 5 archivos).
+- `setup_logging()` se llama al inicio del `lifespan` en `main.py`.
+- Dependencia: `python-json-logger==2.0.7`.
+
+### Monitoreo (`docker-compose.monitoring.yml`)
+- Stack: Loki + Promtail + Grafana.
+- Promtail monta `./logs` y envía `app.log` a Loki. Parsea el JSON para extraer etiquetas `level` y `logger`.
+- Loki configurado en `loki-config.yml`.
+- Grafana en `http://localhost:3000`. Datasource Loki: `http://loki:3100`.
+- Promtail es necesario porque Loki no lee archivos directamente; Promtail actúa de puente entre el archivo y la API push de Loki.
+
+## SonarQube
+- `sonar-project.properties` en la raíz excluye `venv/**` del análisis.
+
 ## Mock test cards
 
 Visa: `4111111111111111` / cvv `123`, `4222222222222222` / cvv `456`  

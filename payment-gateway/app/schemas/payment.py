@@ -47,17 +47,17 @@ class CrearPagoRequest(BaseModel):
 
     @field_validator("numero_tarjeta")
     @classmethod
-    def solo_digitos_tarjeta(cls, v: str) -> str:
-        if not v.isdigit():
+    def card_digits_only(cls, value: str) -> str:
+        if not value.isdigit():
             raise ValueError("El número de tarjeta debe contener solo dígitos.")
-        return v
+        return value
 
     @field_validator("cvv")
     @classmethod
-    def solo_digitos_cvv(cls, v: str) -> str:
-        if not v.isdigit():
+    def cvv_digits_only(cls, value: str) -> str:
+        if not value.isdigit():
             raise ValueError("El CVV debe contener solo dígitos.")
-        return v
+        return value
     
 class PagoResponse(BaseModel):
     """Respuesta de la pasarela al sistema de boletas tras procesar un pago."""

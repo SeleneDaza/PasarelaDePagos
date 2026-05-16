@@ -11,6 +11,24 @@ from app.services.report_service import ReportService
 router = APIRouter(prefix="/reportes", tags=["Reportes"])
 
 
+def _parse_company_id(empresa_id: str) -> uuid.UUID:
+    try:
+        return uuid.UUID(empresa_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Empresa no encontrada.",
+        )
+
+
+def _validate_date_range(fecha_inicio: date | None, fecha_fin: date | None) -> None:
+    if fecha_inicio and fecha_fin and fecha_inicio > fecha_fin:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="fecha_inicio no puede ser mayor a fecha_fin.",
+        )
+
+
 @router.get(
     "/pendientes",
     response_model=ReportePendientesResponse,
@@ -27,7 +45,7 @@ router = APIRouter(prefix="/reportes", tags=["Reportes"])
         404: {"description": "Empresa no encontrada."},
     },
 )
-async def reporte_pendientes(
+async def get_pending_report(
     empresa_id: str = Query(..., description="ID (UUID) de la empresa a consultar."),
     fecha_inicio: date | None = Query(
         None,
@@ -39,19 +57,7 @@ async def reporte_pendientes(
     ),
     db: AsyncSession = Depends(get_db),
 ) -> ReportePendientesResponse:
-    try:
-        parsed_id = uuid.UUID(empresa_id)
-    except ValueError:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Empresa no encontrada.",
-        )
-
-    if fecha_inicio and fecha_fin and fecha_inicio > fecha_fin:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="fecha_inicio no puede ser mayor a fecha_fin.",
-        )
-
+    company_id = _parse_company_id(empresa_id)
+    _validate_date_range(fecha_inicio, fecha_fin)
     service = ReportService(db)
-    return await service.obtener_pendientes(parsed_id, fecha_inicio, fecha_fin)
+    return await service.get_pending(company_id, fecha_inicio, fecha_fin)

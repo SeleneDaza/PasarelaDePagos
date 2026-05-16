@@ -16,38 +16,60 @@ class LiquidationService:
     def __init__(self, db: AsyncSession) -> None:
         self.db = db
 
-    async def liquidar_batch(self, empresa_id: UUID | None = None) -> LiquidacionBatchResponse:
-        logger.info("Iniciando liquidación batch", extra={"empresa_id": str(empresa_id) if empresa_id else "todas"})
-        if empresa_id is not None:
-            await self._validar_empresa(empresa_id)
+    async def liquidate_batch(self, company_id: UUID | None = None) -> LiquidacionBatchResponse:
+        self._log_batch_start(company_id)
+        if company_id is not None:
+            await self._validate_company(company_id)
 
+        transactions = await self._get_pending_transactions(company_id)
+        ids = self._mark_as_liquidated(transactions)
+        await self.db.flush()
+        self._log_batch_complete(ids, company_id)
+        return self._build_batch_response(ids)
+
+    def _log_batch_start(self, company_id: UUID | None) -> None:
+        logger.info(
+            "Iniciando liquidación batch",
+            extra={"empresa_id": str(company_id) if company_id else "todas"},
+        )
+
+    def _log_batch_complete(self, ids: list[UUID], company_id: UUID | None) -> None:
+        logger.info(
+            "Liquidación batch completada",
+            extra={
+                "procesadas": len(ids),
+                "empresa_id": str(company_id) if company_id else "todas",
+            },
+        )
+
+    async def _get_pending_transactions(self, company_id: UUID | None) -> list[Transaccion]:
         stmt = select(Transaccion).where(
             Transaccion.estado_liquidacion == EstadoLiquidacion.no_liquidado
         )
-        if empresa_id is not None:
-            stmt = stmt.where(Transaccion.empresa_id == empresa_id)
+        if company_id is not None:
+            stmt = stmt.where(Transaccion.empresa_id == company_id)
 
         result = await self.db.execute(stmt)
-        transacciones = result.scalars().all()
+        return result.scalars().all()
 
-        ids = []
-        for t in transacciones:
-            t.estado_liquidacion = EstadoLiquidacion.liquidado
-            ids.append(t.id)
+    def _mark_as_liquidated(self, transactions: list[Transaccion]) -> list[UUID]:
+        ids: list[UUID] = []
+        for transaction in transactions:
+            transaction.estado_liquidacion = EstadoLiquidacion.liquidado
+            ids.append(transaction.id)
+        return ids
 
-        await self.db.flush()
-        logger.info("Liquidación batch completada", extra={"procesadas": len(ids), "empresa_id": str(empresa_id) if empresa_id else "todas"})
-
+    def _build_batch_response(self, ids: list[UUID]) -> LiquidacionBatchResponse:
         return LiquidacionBatchResponse(
             procesadas=len(ids),
             ids_liquidadas=ids,
             ejecutado_en=datetime.now(timezone.utc),
         )
 
-    async def _validar_empresa(self, empresa_id: UUID) -> None:
-        result = await self.db.execute(select(Empresa).where(Empresa.id == empresa_id))
-        empresa = result.scalar_one_or_none()
-        if empresa is None or not empresa.activo:
+    async def _validate_company(self, company_id: UUID) -> None:
+        result = await self.db.execute(select(Empresa).where(Empresa.id == company_id))
+        company = result.scalar_one_or_none()
+        if company is None or not company.activo:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Empresa no encontrada.",

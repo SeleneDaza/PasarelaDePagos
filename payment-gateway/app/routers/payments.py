@@ -25,10 +25,10 @@ router = APIRouter(prefix="/pagos", tags=["Pagos"])
         502: {"description": "Servicio de tarjetas no disponible."},
     },
 )
-async def crear_pago(
+async def create_payment(
     payload: CrearPagoRequest,
     db: AsyncSession = Depends(get_db),
 ) -> PagoResponse:
     service = PaymentService(db)
-    transaccion = await service.crear_pago(payload)
-    return transaccion
+    transaction = await service.create_payment(payload)
+    return transaction
