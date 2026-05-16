@@ -2,14 +2,16 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from app.db.database import Base, engine
-from app.routers import payments, mock, reports, liquidations
 from app.config import settings
+from app.db.database import Base, engine
+from app.logging_config import setup_logging
+from app.routers import liquidations, mock, payments, reports
 from app.scheduler import scheduler
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    setup_logging()
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     scheduler.start()

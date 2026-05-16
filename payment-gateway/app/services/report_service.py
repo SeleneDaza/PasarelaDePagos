@@ -1,3 +1,4 @@
+import logging
 from datetime import date, datetime, time, timezone
 from decimal import Decimal
 from uuid import UUID
@@ -5,6 +6,8 @@ from uuid import UUID
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+logger = logging.getLogger(__name__)
 
 from app.models.models import Empresa, EstadoLiquidacion, Transaccion
 from app.schemas.payment import ReportePendientesResponse, TransaccionReporteItem
@@ -20,6 +23,10 @@ class ReportService:
         fecha_inicio: date | None,
         fecha_fin: date | None,
     ) -> ReportePendientesResponse:
+        logger.info(
+            "Generando reporte de pendientes",
+            extra={"empresa_id": str(empresa_id), "fecha_inicio": str(fecha_inicio), "fecha_fin": str(fecha_fin)},
+        )
         empresa = await self._validar_empresa(empresa_id)
 
         stmt = select(Transaccion).where(
@@ -39,6 +46,10 @@ class ReportService:
         transacciones = result.scalars().all()
 
         total = sum((Decimal(str(t.monto)) for t in transacciones), Decimal("0"))
+        logger.info(
+            "Reporte generado",
+            extra={"empresa_id": str(empresa_id), "cantidad": len(transacciones), "total_pendiente": str(total)},
+        )
 
         return ReportePendientesResponse(
             empresa_id=empresa_id,
