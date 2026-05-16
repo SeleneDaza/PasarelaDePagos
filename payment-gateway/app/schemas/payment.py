@@ -2,9 +2,22 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 
+from fastapi import HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
 
 from app.models.models import EstadoLiquidacion, EstadoTransaccion, TipoTarjeta
+
+
+def _parse_empresa_id(v: object) -> uuid.UUID:
+    if isinstance(v, uuid.UUID):
+        return v
+    try:
+        return uuid.UUID(str(v))
+    except (ValueError, AttributeError):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Empresa no encontrada.",
+        )
 
 
 # ---------- Entrada ----------
@@ -16,6 +29,11 @@ class CrearPagoRequest(BaseModel):
         ...,
         description="ID de la empresa autorizada que recibirá el cobro.",
     )
+
+    @field_validator("empresa_id", mode="before")
+    @classmethod
+    def validate_empresa_id(cls, v: object) -> uuid.UUID:
+        return _parse_empresa_id(v)
     monto: Decimal = Field(
         ...,
         gt=0,
@@ -47,17 +65,17 @@ class CrearPagoRequest(BaseModel):
 
     @field_validator("numero_tarjeta")
     @classmethod
-    def solo_digitos_tarjeta(cls, v: str) -> str:
-        if not v.isdigit():
+    def card_digits_only(cls, value: str) -> str:
+        if not value.isdigit():
             raise ValueError("El número de tarjeta debe contener solo dígitos.")
-        return v
+        return value
 
     @field_validator("cvv")
     @classmethod
-    def solo_digitos_cvv(cls, v: str) -> str:
-        if not v.isdigit():
+    def cvv_digits_only(cls, value: str) -> str:
+        if not value.isdigit():
             raise ValueError("El CVV debe contener solo dígitos.")
-        return v
+        return value
     
 class PagoResponse(BaseModel):
     """Respuesta de la pasarela al sistema de boletas tras procesar un pago."""
@@ -94,6 +112,13 @@ class LiquidacionBatchRequest(BaseModel):
         None,
         description="ID de la empresa a liquidar. Si se omite, se liquidan todas las empresas.",
     )
+
+    @field_validator("empresa_id", mode="before")
+    @classmethod
+    def validate_empresa_id(cls, v: object) -> uuid.UUID | None:
+        if v is None:
+            return None
+        return _parse_empresa_id(v)
 
 
 class LiquidacionBatchResponse(BaseModel):

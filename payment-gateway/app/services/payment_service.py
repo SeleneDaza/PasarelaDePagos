@@ -23,87 +23,115 @@ class PaymentService:
         self.db = db
         self.card_client = CardClient()
 
-    async def crear_pago(self, payload: CrearPagoRequest) -> Transaccion:
+    async def create_payment(self, request: CrearPagoRequest) -> Transaccion:
+        self._log_payment_start(request)
+        company = await self._get_active_company(request.empresa_id)
+        logger.info("Empresa validada: %s", company.nombre, extra={"empresa_id": str(request.empresa_id)})
+        try:
+            card_is_valid = await self._verify_card(request)
+        except CardServiceError as exc:
+            return await self._register_failed_transaction(request, exc)
+        transaction_status, liquidation_status = self._resolve_status(card_is_valid)
+        return await self._save_transaction(request, transaction_status, liquidation_status)
+
+    def _log_payment_start(self, request: CrearPagoRequest) -> None:
         logger.info(
             "Iniciando pago",
-            extra={"empresa_id": str(payload.empresa_id), "monto": str(payload.monto), "tipo_tarjeta": payload.tipo_tarjeta},
+            extra={
+                "empresa_id": str(request.empresa_id),
+                "monto": str(request.monto),
+                "tipo_tarjeta": request.tipo_tarjeta,
+            },
         )
 
-        empresa = await self._obtener_empresa_activa(payload.empresa_id)
-        logger.info("Empresa validada: %s", empresa.nombre, extra={"empresa_id": str(payload.empresa_id)})
-
-        try:
-            tarjeta_valida = await self.card_client.verificar_tarjeta(
-                tipo_tarjeta=payload.tipo_tarjeta,
-                numero_tarjeta=payload.numero_tarjeta,
-                cvv=payload.cvv,
-                fecha_expiracion=payload.fecha_expiracion,
-            )
-        except CardServiceError as exc:
-            logger.warning("Fallo técnico al verificar tarjeta: %s", exc, extra={"empresa_id": str(payload.empresa_id)})
-            transaccion = self._construir_transaccion(
-                payload=payload,
-                estado_transaccion=EstadoTransaccion.fallido,
-                estado_liquidacion=None,
-            )
-            self.db.add(transaccion)
-            await self.db.flush()
-            logger.info("Transacción registrada con estado=fallido, id=%s", transaccion.id)
-            return transaccion
-
-        if tarjeta_valida:
-            estado_transaccion = EstadoTransaccion.aprobado
-            estado_liquidacion = EstadoLiquidacion.no_liquidado
-        else:
-            estado_transaccion = EstadoTransaccion.rechazado
-            estado_liquidacion = None
-
-        transaccion = self._construir_transaccion(
-            payload=payload,
-            estado_transaccion=estado_transaccion,
-            estado_liquidacion=estado_liquidacion,
+    async def _verify_card(self, request: CrearPagoRequest) -> bool:
+        return await self.card_client.verify_card(
+            card_type=request.tipo_tarjeta,
+            card_number=request.numero_tarjeta,
+            cvv=request.cvv,
+            expiration_date=request.fecha_expiracion,
         )
-        self.db.add(transaccion)
+
+    async def _register_failed_transaction(
+        self,
+        request: CrearPagoRequest,
+        error: CardServiceError,
+    ) -> Transaccion:
+        logger.warning(
+            "Fallo técnico al verificar tarjeta: %s",
+            error,
+            extra={"empresa_id": str(request.empresa_id)},
+        )
+        transaction = self._build_transaction(
+            request=request,
+            transaction_status=EstadoTransaccion.fallido,
+            liquidation_status=None,
+        )
+        self.db.add(transaction)
+        await self.db.flush()
+        logger.info("Transacción registrada con estado=fallido, id=%s", transaction.id)
+        return transaction
+
+    def _resolve_status(
+        self,
+        card_is_valid: bool,
+    ) -> tuple[EstadoTransaccion, EstadoLiquidacion | None]:
+        if card_is_valid:
+            return EstadoTransaccion.aprobado, EstadoLiquidacion.no_liquidado
+        return EstadoTransaccion.rechazado, None
+
+    async def _save_transaction(
+        self,
+        request: CrearPagoRequest,
+        transaction_status: EstadoTransaccion,
+        liquidation_status: EstadoLiquidacion | None,
+    ) -> Transaccion:
+        transaction = self._build_transaction(
+            request=request,
+            transaction_status=transaction_status,
+            liquidation_status=liquidation_status,
+        )
+        self.db.add(transaction)
         await self.db.flush()
         logger.info(
             "Transacción registrada",
-            extra={"transaccion_id": str(transaccion.id), "estado": estado_transaccion.value},
+            extra={"transaccion_id": str(transaction.id), "estado": transaction_status.value},
         )
-        return transaccion
+        return transaction
 
     # ---------- Helpers privados ----------
 
-    async def _obtener_empresa_activa(self, empresa_id) -> Empresa:
+    async def _get_active_company(self, company_id) -> Empresa:
         result = await self.db.execute(
-            select(Empresa).where(Empresa.id == empresa_id)
+            select(Empresa).where(Empresa.id == company_id)
         )
-        empresa = result.scalar_one_or_none()
-        if empresa is None:
+        company = result.scalar_one_or_none()
+        if company is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Empresa no encontrada.",
             )
-        if not empresa.activo:
+        if not company.activo:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Empresa no autorizada para cobrar.",
             )
-        return empresa
+        return company
 
-    def _construir_transaccion(
+    def _build_transaction(
         self,
-        payload: CrearPagoRequest,
-        estado_transaccion: EstadoTransaccion,
-        estado_liquidacion: EstadoLiquidacion | None,
+        request: CrearPagoRequest,
+        transaction_status: EstadoTransaccion,
+        liquidation_status: EstadoLiquidacion | None,
     ) -> Transaccion:
         # cliente_id es el ID que el cliente tiene en la BD de su tarjeta.
         # Por ahora usamos los últimos 4 dígitos como placeholder hasta que los
         # serverless devuelvan el ID real del cliente.
         return Transaccion(
-            empresa_id=payload.empresa_id,
-            monto=payload.monto,
-            tipo_tarjeta=payload.tipo_tarjeta,
-            cliente_id=payload.numero_tarjeta[-4:],
-            estado_transaccion=estado_transaccion,
-            estado_liquidacion=estado_liquidacion,
+            empresa_id=request.empresa_id,
+            monto=request.monto,
+            tipo_tarjeta=request.tipo_tarjeta,
+            cliente_id=request.numero_tarjeta[-4:],
+            estado_transaccion=transaction_status,
+            estado_liquidacion=liquidation_status,
         )
