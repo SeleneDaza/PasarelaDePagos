@@ -3,16 +3,18 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.db.database import Base, engine
-from app.routers import payments, mock, reports
+from app.routers import payments, mock, reports, liquidations
 from app.config import settings
+from app.scheduler import scheduler
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Crea las tablas al iniciar (en producción se usa Alembic)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    scheduler.start()
     yield
+    scheduler.shutdown(wait=False)
 
 
 app = FastAPI(
@@ -24,6 +26,7 @@ app = FastAPI(
 
 app.include_router(payments.router)
 app.include_router(reports.router)
+app.include_router(liquidations.router)
 
 if settings.APP_ENV == "development":
     app.include_router(mock.router)

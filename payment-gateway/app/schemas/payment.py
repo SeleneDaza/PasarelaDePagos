@@ -87,6 +87,21 @@ class PagoResponse(BaseModel):
         }[self.estado_transaccion]
 
 
+# ---------- Liquidación ----------
+
+class LiquidacionBatchRequest(BaseModel):
+    empresa_id: uuid.UUID | None = Field(
+        None,
+        description="ID de la empresa a liquidar. Si se omite, se liquidan todas las empresas.",
+    )
+
+
+class LiquidacionBatchResponse(BaseModel):
+    procesadas: int
+    ids_liquidadas: list[uuid.UUID]
+    ejecutado_en: datetime
+
+
 # ---------- Reportes ----------
 
 class TransaccionReporteItem(BaseModel):
