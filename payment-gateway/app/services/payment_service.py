@@ -1,6 +1,10 @@
+import logging
+
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+logger = logging.getLogger(__name__)
 
 from app.models.models import (
     Empresa,
@@ -20,10 +24,14 @@ class PaymentService:
         self.card_client = CardClient()
 
     async def crear_pago(self, payload: CrearPagoRequest) -> Transaccion:
-        # 1. Validar que la empresa existe y está activa
-        empresa = await self._obtener_empresa_activa(payload.empresa_id)
+        logger.info(
+            "Iniciando pago",
+            extra={"empresa_id": str(payload.empresa_id), "monto": str(payload.monto), "tipo_tarjeta": payload.tipo_tarjeta},
+        )
 
-        # 2. Verificar la tarjeta con el servicio correspondiente
+        empresa = await self._obtener_empresa_activa(payload.empresa_id)
+        logger.info("Empresa validada: %s", empresa.nombre, extra={"empresa_id": str(payload.empresa_id)})
+
         try:
             tarjeta_valida = await self.card_client.verificar_tarjeta(
                 tipo_tarjeta=payload.tipo_tarjeta,
@@ -31,8 +39,8 @@ class PaymentService:
                 cvv=payload.cvv,
                 fecha_expiracion=payload.fecha_expiracion,
             )
-        except CardServiceError:
-            # 3a. Falla técnica → estado_transaccion = fallido, sin liquidación
+        except CardServiceError as exc:
+            logger.warning("Fallo técnico al verificar tarjeta: %s", exc, extra={"empresa_id": str(payload.empresa_id)})
             transaccion = self._construir_transaccion(
                 payload=payload,
                 estado_transaccion=EstadoTransaccion.fallido,
@@ -40,9 +48,9 @@ class PaymentService:
             )
             self.db.add(transaccion)
             await self.db.flush()
+            logger.info("Transacción registrada con estado=fallido, id=%s", transaccion.id)
             return transaccion
 
-        # 3b. Servicio respondió
         if tarjeta_valida:
             estado_transaccion = EstadoTransaccion.aprobado
             estado_liquidacion = EstadoLiquidacion.no_liquidado
@@ -57,6 +65,10 @@ class PaymentService:
         )
         self.db.add(transaccion)
         await self.db.flush()
+        logger.info(
+            "Transacción registrada",
+            extra={"transaccion_id": str(transaccion.id), "estado": estado_transaccion.value},
+        )
         return transaccion
 
     # ---------- Helpers privados ----------
