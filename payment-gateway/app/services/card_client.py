@@ -1,3 +1,4 @@
+import json
 import httpx
 
 from app.config import settings
@@ -17,6 +18,7 @@ class CardClient:
         self._urls = {
             TipoTarjeta.visa: f"{settings.VISA_SERVICE_URL}/verificar-tarjeta",
             TipoTarjeta.mastercard: f"{settings.MASTERCARD_SERVICE_URL}/verificar-tarjeta",
+            TipoTarjeta.nu: f"{settings.NU_SERVICE_URL}/validate",
         }
 
     async def verify_card(
@@ -29,7 +31,14 @@ class CardClient:
         url = self._urls[card_type]
         payload = self._build_payload(card_type, card_number, cvv, expiration_date)
         response = await self._post_request(url, payload, card_type)
-        data = response.json()
+        if card_type == TipoTarjeta.nu:
+            return response.text.strip() == "VALID"
+        try:
+            data = response.json()
+        except json.JSONDecodeError as exc:
+            raise CardServiceError(
+                f"El servicio {card_type.value} devolvió una respuesta no válida: {exc}"
+            ) from exc
         if card_type == TipoTarjeta.mastercard:
             return bool(data.get("exists", False))
         return bool(data.get("existe", False))
@@ -42,7 +51,9 @@ class CardClient:
     expiration_date: str | None,
     ) -> dict[str, str]:
         if card_type == TipoTarjeta.mastercard:
-         return {"card_number": card_number, "cvv": cvv}
+            return {"card_number": card_number, "cvv": cvv}
+        if card_type == TipoTarjeta.nu:
+            return {"number": card_number, "csv": cvv, "token": settings.NU_TOKEN}
         return {"numero_tarjeta": card_number, "cvv": cvv}
 
     async def _post_request(
