@@ -1,48 +1,47 @@
 import logging
-logger = logging.getLogger("app.services.card_client")
+import logging.config
+from pathlib import Path
 
-async def _post_request(
-    self,
-    url: str,
-    payload: dict,
-    card_type: TipoTarjeta,
-) -> httpx.Response:
-    logger.info(
-        f"Llamando servicio {card_type.value}",
-        extra={"service": card_type.value, "url": url}
-    )
-    try:
-        async with httpx.AsyncClient(timeout=self.TIMEOUT_SECONDS) as client:
-            response = await client.post(url, json=payload)
-        logger.info(
-            f"Respuesta de {card_type.value}: {response.status_code}",
-            extra={"service": card_type.value, "status": response.status_code}
-        )
-    except (httpx.TimeoutException, httpx.NetworkError) as exc:
-        logger.error(
-            f"Error de red con {card_type.value}: {exc}",
-            extra={"service": card_type.value, "error": str(exc)}
-        )
-        raise CardServiceError(
-            f"Error al comunicarse con el servicio {card_type.value}: {exc}"
-        ) from exc
+Path("logs").mkdir(exist_ok=True)
 
-    self._raise_for_status(response, card_type)
-    return response
+LOGGING_CONFIG = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "json": {
+            "()": "pythonjsonlogger.jsonlogger.JsonFormatter",
+            "fmt": "%(asctime)s %(levelname)s %(name)s %(message)s %(service)s %(status)s %(error)s",
+        },
+        "console": {
+            "format": "%(asctime)s [%(levelname)s] %(name)s | %(message)s",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "console",
+        },
+        "file": {
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": "logs/app.log",
+            "maxBytes": 10_485_760,
+            "backupCount": 5,
+            "formatter": "json",
+            "encoding": "utf-8",
+        },
+    },
+    "loggers": {
+        "app": {
+            "handlers": ["console", "file"],
+            "level": "INFO",
+            "propagate": False,
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": "WARNING",
+    },
+}
 
-def _raise_for_status(self, response: httpx.Response, card_type: TipoTarjeta) -> None:
-    if response.status_code >= 500:
-        logger.error(
-            f"Error 5xx en {card_type.value}",
-            extra={"service": card_type.value, "status": response.status_code}
-        )
-        raise CardServiceError(
-            f"El servicio {card_type.value} respondió con error {response.status_code}"
-        )
-    if card_type == TipoTarjeta.nu and response.status_code == 400:
-        logger.warning(
-            f"Token invalido para Nu",
-            extra={"service": "nu", "status": 400}
-        )
-        return
-    response.raise_for_status()
+def setup_logging() -> None:
+    logging.config.dictConfig(LOGGING_CONFIG)
