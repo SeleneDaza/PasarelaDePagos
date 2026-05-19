@@ -12,6 +12,7 @@ from app.db.database import Base
 class TipoTarjeta(str, enum.Enum):
     visa = "visa"
     mastercard = "mastercard"
+    nu = "nu"
 
 
 class EstadoTransaccion(str, enum.Enum):
