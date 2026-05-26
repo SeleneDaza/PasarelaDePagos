@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from app.config import settings
 from app.db.database import Base, engine
 from app.logging_config import setup_logging
-from app.routers import liquidations, mock, payments, reports
+from app.routers import liquidations, mock, payments, reports, ws_payments
 from app.scheduler import scheduler
 
 
@@ -27,6 +27,7 @@ app = FastAPI(
 )
 
 app.include_router(payments.router)
+app.include_router(ws_payments.router)
 app.include_router(reports.router)
 app.include_router(liquidations.router)
 
