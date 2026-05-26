@@ -1,6 +1,7 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
+from enum import Enum
 
 from fastapi import HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
@@ -145,3 +146,20 @@ class ReportePendientesResponse(BaseModel):
     cantidad: int
     total_pendiente: Decimal
     transacciones: list[TransaccionReporteItem]
+
+
+# ---------- WebSocket ----------
+
+class WebSocketPhase(str, Enum):
+    transaccion_creada = "transaccion_creada"
+    verificando_tarjeta = "verificando_tarjeta"
+    respuesta_tarjeta = "respuesta_tarjeta"
+    resultado_final = "resultado_final"
+
+
+class WebSocketMessage(BaseModel):
+    fase: WebSocketPhase
+    mensaje: str
+    detalle: str
+    estado_transaccion: EstadoTransaccion | None = None
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
