@@ -2,6 +2,8 @@ import logging
 import logging.config
 from pathlib import Path
 
+from app.structured_logger import init_csv_log
+
 Path("logs").mkdir(exist_ok=True)
 
 LOGGING_CONFIG = {
@@ -45,3 +47,4 @@ LOGGING_CONFIG = {
 
 def setup_logging() -> None:
     logging.config.dictConfig(LOGGING_CONFIG)
+    init_csv_log()
