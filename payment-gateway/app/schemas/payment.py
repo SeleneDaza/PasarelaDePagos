@@ -77,11 +77,36 @@ class CrearPagoRequest(BaseModel):
             raise ValueError("El CVV debe contener solo dígitos.")
         return value
     
+class FaseResponse(BaseModel):
+    numero: int
+    tipo: str
+    contenido: str
+
+
+_FASES_INICIALES = [
+    FaseResponse(numero=1, tipo="INFO", contenido="El sistema recibió tu solicitud y está preparando el pago."),
+    FaseResponse(numero=2, tipo="INFO", contenido="Verificando que la empresa está autorizada para cobrar."),
+    FaseResponse(numero=3, tipo="INFO", contenido="Consultando con Visa/Mastercard si la tarjeta existe."),
+]
+
+_FASE_4 = {
+    EstadoTransaccion.aprobado:  FaseResponse(numero=4, tipo="INFO",  contenido="El servicio respondió: tarjeta aprobada."),
+    EstadoTransaccion.rechazado: FaseResponse(numero=4, tipo="ERROR", contenido="El servicio respondió: tarjeta no encontrada."),
+    EstadoTransaccion.fallido:   FaseResponse(numero=4, tipo="ERROR", contenido="No se pudo contactar con el servicio de tarjetas."),
+}
+
+_FASE_5 = {
+    EstadoTransaccion.aprobado:  FaseResponse(numero=5, tipo="EXITO", contenido="Pago aprobado, reservando tu boleta."),
+    EstadoTransaccion.rechazado: FaseResponse(numero=5, tipo="ERROR", contenido="Pago rechazado, no se realizó ningún cobro."),
+    EstadoTransaccion.fallido:   FaseResponse(numero=5, tipo="ERROR", contenido="Pago rechazado, no se realizó ningún cobro."),
+}
+
+
 class PagoResponse(BaseModel):
     """Respuesta de la pasarela al sistema de boletas tras procesar un pago."""
- 
+
     model_config = ConfigDict(from_attributes=True)
- 
+
     id: uuid.UUID
     empresa_id: uuid.UUID
     monto: Decimal
@@ -92,6 +117,11 @@ class PagoResponse(BaseModel):
 
     @computed_field
     @property
+    def fases(self) -> list[FaseResponse]:
+        return [*_FASES_INICIALES, _FASE_4[self.estado_transaccion], _FASE_5[self.estado_transaccion]]
+
+    @computed_field
+    @property
     def success(self) -> bool:
         return self.estado_transaccion == EstadoTransaccion.aprobado
 
@@ -99,7 +129,7 @@ class PagoResponse(BaseModel):
     @property
     def message(self) -> str:
         return {
-            EstadoTransaccion.aprobado: "Pago aprobado correctamente.",
+            EstadoTransaccion.aprobado: "Pago aprobado",
             EstadoTransaccion.rechazado: "Tarjeta rechazada.",
             EstadoTransaccion.fallido: "Error al procesar el pago. Intente más tarde.",
         }[self.estado_transaccion]
