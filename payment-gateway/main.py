@@ -6,7 +6,7 @@ from app.config import settings
 from app.db.database import Base, engine
 from app.logging_config import setup_logging
 from app.middleware import CorrelationMiddleware
-from app.routers import liquidations, mock, payments, reports, ws
+from app.routers import liquidations, mock, payments, reports
 from app.scheduler import scheduler
 
 
@@ -32,7 +32,6 @@ app.add_middleware(CorrelationMiddleware)
 app.include_router(payments.router)
 app.include_router(reports.router)
 app.include_router(liquidations.router)
-app.include_router(ws.router)
 
 if settings.APP_ENV == "development":
     app.include_router(mock.router)

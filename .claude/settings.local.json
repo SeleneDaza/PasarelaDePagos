@@ -3,7 +3,8 @@
     "allow": [
       "PowerShell(py --version)",
       "PowerShell(py -m pip list)",
-      "Bash(venv\\\\Scripts\\\\python.exe -c \"from app.services.card_client import CardClient; from app.routers.mock import router; print\\('OK'\\)\")"
+      "Bash(venv\\\\Scripts\\\\python.exe -c \"from app.services.card_client import CardClient; from app.routers.mock import router; print\\('OK'\\)\")",
+      "Bash(python -c \"import main\")"
     ]
   }
 }
