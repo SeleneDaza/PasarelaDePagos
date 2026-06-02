@@ -9,10 +9,11 @@ from app.middleware import CorrelationMiddleware
 from app.routers import liquidations, mock, payments, reports
 from app.scheduler import scheduler
 
+setup_logging()
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    setup_logging()
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     scheduler.start()

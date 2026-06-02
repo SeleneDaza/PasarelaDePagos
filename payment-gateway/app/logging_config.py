@@ -27,7 +27,7 @@ LOGGING_CONFIG = {
             "class": "logging.handlers.RotatingFileHandler",
             "filename": "logs/app.log",
             "maxBytes": 10_485_760,
-            "backupCount": 5,
+            "backupCount": 7,
             "formatter": "json",
             "encoding": "utf-8",
         },
