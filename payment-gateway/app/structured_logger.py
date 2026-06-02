@@ -1,6 +1,5 @@
 import csv
 import time
-import uuid
 from contextvars import ContextVar
 from datetime import datetime, timezone
 from enum import Enum
@@ -34,9 +33,6 @@ class LogEvent(str, Enum):
     PAYMENT_DECLINED = "PAYMENT_DECLINED"
     PAYMENT_CAPTURED = "PAYMENT_CAPTURED"
     TICKETS_GENERATED = "TICKETS_GENERATED"
-    WS_CONNECTED = "WS_CONNECTED"
-    WS_MESSAGE_RECEIVED = "WS_MESSAGE_RECEIVED"
-    WS_MESSAGE_SENT = "WS_MESSAGE_SENT"
     AUTH_LOGIN_SUCCESS = "AUTH_LOGIN_SUCCESS"
     AUTH_LOGIN_FAILED = "AUTH_LOGIN_FAILED"
 
@@ -49,7 +45,6 @@ class LogStatus(str, Enum):
     CONNECTED = "CONNECTED"
     DELIVERED = "DELIVERED"
     QUEUED = "QUEUED"
-    DISCONNECTED = "DISCONNECTED"
 
 
 def _utc_now() -> str:
@@ -146,31 +141,6 @@ def logError(
         error_code=error_code,
         **kwargs,
     )
-
-
-def build_ws_message(
-    message_type: str,
-    level: LogLevel,
-    source: str,
-    *,
-    transaction_id: str = "",
-    session_id: str = "",
-    status: str = "",
-    payload: dict | None = None,
-    error: str | None = None,
-) -> dict:
-    return {
-        "timestamp": _utc_now(),
-        "messageId": str(uuid.uuid4()),
-        "transactionId": transaction_id,
-        "sessionId": session_id,
-        "type": message_type,
-        "level": level.value,
-        "source": source,
-        "status": status,
-        "payload": payload or {},
-        "error": error,
-    }
 
 
 def elapsed_ms(start: float) -> int:
